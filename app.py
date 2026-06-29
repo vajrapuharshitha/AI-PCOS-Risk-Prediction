@@ -1,130 +1,141 @@
+from textwrap import dedent
+
+app = dedent('''
 import streamlit as st
 import numpy as np
+import pandas as pd
 import pickle
+import feedparser
 
-st.set_page_config(
-    page_title="AI-Assisted PCOS Risk Prediction",
-    page_icon="🧬",
-    layout="wide"
-)
+st.set_page_config(page_title="AI-Assisted PCOS Risk Prediction", layout="wide")
 
-# Theme
 st.markdown("""
 <style>
 .stApp{
 background: linear-gradient(to bottom,#f7e8ff,#e8f6ff);
 }
-
-.box{
-padding:20px;
-border-radius:15px;
-background:white;
-margin:10px;
-box-shadow:2px 2px 15px rgba(0,0,0,0.1);
+.block-container{
+padding-top:1rem;
 }
 </style>
 """, unsafe_allow_html=True)
 
-model=pickle.load(open("xgb_pcos_model.pkl","rb"))
+@st.cache_resource
+def load_model():
+    return pickle.load(open("xgb_pcos_model.pkl","rb"))
+
+model=load_model()
 
 st.title("🧬 AI-Assisted PCOS Risk Prediction System")
 st.caption("Developed by Harshitha Vajram")
 
-page=st.sidebar.selectbox(
+page=st.sidebar.radio(
 "Navigation",
-["🏠 Home","📊 Predict","💚 Lifestyle","🧪 Biomarkers","👩‍💻 About"]
+["🏠 Home","📊 Predict","💚 Lifestyle","📰 PCOS Research News","👩‍💻 About"]
 )
 
 if page=="🏠 Home":
-
-    st.markdown(
-    """
-    <div class='box'>
-    <h2>Welcome</h2>
-    Early AI-assisted screening support for PCOS risk assessment.
-    </div>
-    """,
-    unsafe_allow_html=True
-    )
-
-    st.subheader("📰 PCOS Research Updates")
-
-    st.info("Researchers continue studying genetics, metabolism and biomarker patterns in PCOS.")
-    st.info("Lifestyle interventions and hormonal biomarkers remain active areas of research.")
-    st.info("Emerging studies explore gut microbiome and metabolic pathways.")
-
-if page=="💚 Lifestyle":
-
-    st.header("Healthy Lifestyle Hub")
-
-    st.success("🥗 Eat fiber-rich foods and balanced meals")
-    st.success("🚶 Regular exercise can improve metabolic health")
-    st.success("😴 Aim for consistent sleep")
-    st.success("💧 Stay hydrated")
-    st.success("🧘 Stress management matters")
-
-if page=="🧪 Biomarkers":
-
-    st.header("Biomarker Education")
-
-    with st.expander("AMH"):
-        st.write("Anti-Müllerian Hormone: may be elevated in some PCOS patterns.")
-
-    with st.expander("LH/FSH"):
-        st.write("Hormones related to ovulation patterns.")
-
-    with st.expander("BMI"):
-        st.write("Body mass index can influence metabolic risk.")
+    st.header("Welcome")
+    st.info("AI-assisted screening support for PCOS risk assessment.")
+    st.write("Includes biomarkers, lifestyle tips, charts and research updates.")
 
 if page=="📊 Predict":
 
-    feature_names=[
-    'Sl_No','Patient_File_No','Age_yrs','Weight_Kg',
-    'HeightCm','BMI','Blood_Group','Pulse_ratebpm',
-    'RR_breathsmin','Hbgdl','CycleRI',
-    'Cycle_lengthdays','Marraige_Status_Yrs',
-    'PregnantYN','No_of_aborptions',
-    'I___betaHCGmIUmL','II____betaHCGmIUmL',
-    'FSHmIUmL','LHmIUmL','FSHLH',
-    'Hipinch','Waistinch','WaistHip_Ratio',
-    'TSH_mIUL','AMHngmL','PRLngmL',
-    'Vit_D3_ngmL','PRGngmL','RBSmgdl',
-    'Weight_gainYN','hair_growthYN',
-    'Skin_darkening_YN','Hair_lossYN',
-    'PimplesYN','Fast_food_YN',
-    'RegExerciseYN','BP__Systolic_mmHg',
-    'BP__Diastolic_mmHg','Follicle_No_L',
-    'Follicle_No_R','Avg_F_size_L_mm',
-    'Avg_F_size_R_mm','Endometrium_mm'
-    ]
+    st.subheader("Patient Parameters")
 
-    inputs=[]
+    features=[
+'Sl_No','Patient_File_No','Age_yrs','Weight_Kg','HeightCm','BMI',
+'Blood_Group','Pulse_ratebpm','RR_breathsmin','Hbgdl',
+'CycleRI','Cycle_lengthdays','Marraige_Status_Yrs',
+'PregnantYN','No_of_aborptions','I___betaHCGmIUmL',
+'II____betaHCGmIUmL','FSHmIUmL','LHmIUmL','FSHLH',
+'Hipinch','Waistinch','WaistHip_Ratio','TSH_mIUL',
+'AMHngmL','PRLngmL','Vit_D3_ngmL','PRGngmL',
+'RBSmgdl','Weight_gainYN','hair_growthYN',
+'Skin_darkening_YN','Hair_lossYN','PimplesYN',
+'Fast_food_YN','RegExerciseYN',
+'BP__Systolic_mmHg','BP__Diastolic_mmHg',
+'Follicle_No_L','Follicle_No_R',
+'Avg_F_size_L_mm','Avg_F_size_R_mm',
+'Endometrium_mm'
+]
 
-    for f in feature_names:
-        x=st.number_input(f,value=0.0)
-        inputs.append(x)
+    vals=[]
+    c1,c2=st.columns(2)
 
-    if st.button("Predict"):
+    for i,f in enumerate(features):
+        with c1 if i%2==0 else c2:
+            vals.append(st.number_input(f,value=0.0))
 
-        sample=np.array(inputs).reshape(1,-1)
-
+    if st.button("Predict Risk"):
+        sample=np.array(vals).reshape(1,-1)
         prob=model.predict_proba(sample)[0][1]
 
-        st.metric("Risk Score",f"{prob:.2%}")
+        st.header("🧬 Risk Analysis Report")
+
+        st.metric("Risk Score",f"{prob:.1%}")
+        st.progress(float(prob))
 
         if prob<0.35:
             st.success("✅ Low Risk")
-
         elif prob<0.65:
             st.warning("⚠ Moderate Risk")
-
         else:
             st.error("🚨 High Risk")
 
+        chart=pd.DataFrame({
+            "Feature":["BMI","AMH","LH","Follicles"],
+            "Value":[vals[5],vals[24],vals[18],vals[38]]
+        })
+
+        st.subheader("📊 Biomarker Dashboard")
+        st.bar_chart(chart.set_index("Feature"))
+
+        st.subheader("💚 Personalized Guidance")
+
+        if vals[5]>25:
+            st.warning("BMI elevated → regular exercise and balanced meals may help.")
+        if vals[24]>5:
+            st.info("AMH elevated → discuss hormonal interpretation with healthcare professionals.")
+        if vals[35]==0:
+            st.info("Regular physical activity may support metabolic health.")
+
+if page=="💚 Lifestyle":
+    st.header("Healthy Lifestyle Hub")
+    st.success("🥗 Increase fiber-rich foods")
+    st.success("🚶 Exercise regularly")
+    st.success("😴 Sleep 7–8 hours")
+    st.success("💧 Stay hydrated")
+    st.success("🧘 Manage stress")
+
+if page=="📰 PCOS Research News":
+    st.header("Latest PCOS News")
+
+    feed=feedparser.parse(
+    "https://news.google.com/rss/search?q=PCOS"
+    )
+
+    for entry in feed.entries[:8]:
+        st.write("🔹",entry.title)
+        st.write(entry.link)
+        st.divider()
+
 if page=="👩‍💻 About":
+    st.header("Portfolio")
+    st.write("Developer: Harshitha Vajram")
+    st.write("Project: AI-Assisted PCOS Risk Prediction")
+    st.write("ML + Healthcare + Streamlit")
+''')
 
-    st.header("Developer Portfolio")
+req = """streamlit
+numpy
+pandas
+scikit-learn
+xgboost
+feedparser
+"""
 
-    st.write("Harshitha Vajram")
-    st.write("AI-Assisted PCOS Risk Prediction Project")
-    st.write("Machine Learning + Healthcare + Streamlit")
+open("/mnt/data/app.py","w").write(app)
+open("/mnt/data/requirements.txt","w").write(req)
+
+print("files created")
